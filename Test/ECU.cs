@@ -11,6 +11,12 @@ namespace Test {
 		const CallingConvention CConv = CallingConvention.Cdecl;
 
 		[DllImport(DllName, CallingConvention = CConv)]
-		public static extern void init();
+		public static extern void ecu_init();
+
+		[DllImport(DllName, CallingConvention = CConv)]
+		public static extern void ecu_loop();
+
+		[DllImport(DllName, CallingConvention = CConv)]
+		public static extern void ecu_interrupt(int n);
 	}
 }
