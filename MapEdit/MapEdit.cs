@@ -13,8 +13,62 @@ using unvell.ReoGrid;
 using unvell.ReoGrid.Graphics;
 
 namespace MapEdit {
+	class GridSelection {
+		public Worksheet Sheet;
+		public Cell A, B, C, D;
+
+		public int X1 {
+			get {
+				return A.Column;
+			}
+		}
+
+		public int X2 {
+			get {
+				return B.Column;
+			}
+		}
+
+		public int Y1 {
+			get {
+				return A.Row;
+			}
+		}
+
+		public int Y2 {
+			get {
+				return C.Row;
+			}
+		}
+
+		public int Width {
+			get {
+				return X2 - X1 + 1;
+			}
+		}
+
+		public int Height {
+			get {
+				return Y2 - Y1 + 1;
+			}
+		}
+
+		public GridSelection() {
+		}
+
+		public GridSelection(Worksheet Sheet) {
+			this.Sheet = Sheet;
+			A = Sheet.Cells[0, 0];
+			B = Sheet.Cells[0, Sheet.ColumnCount - 1];
+			C = Sheet.Cells[Sheet.RowCount - 1, 0];
+			D = Sheet.Cells[Sheet.RowCount - 1, Sheet.ColumnCount - 1];
+		}
+	}
+
 	public partial class MapEdit : Form {
 		EditableData CurrentEdited;
+		ContextMenu CtxMenu;
+		GridSelection Selection;
 
 		public MapEdit() {
 			InitializeComponent();
@@ -25,23 +79,67 @@ namespace MapEdit {
 
 			Grid.DisableSettings(WorkbookSettings.View_ShowSheetTabControl);
 			Grid.Click += GridOnClick;
+			Grid.MouseClick += OnMouseClick;
 
 			Edit(null);
 			Tree.AfterSelect += TreeSelected;
+		}
+
+		private void OnMouseClick(object S, MouseEventArgs E) {
+			if (E.Button == MouseButtons.Right) {
+				Worksheet Sheet = Grid.CurrentWorksheet;
+				RangePosition CurRange = Sheet.SelectionRange;
+
+				if (CtxMenu == null) {
+					CtxMenu = new ContextMenu();
+					CtxMenu.MenuItems.Add(new MenuItem("Interpolate", (SS, EE) => Interpolate(Selection)));
+				}
+
+				if (Selection == null)
+					Selection = new GridSelection();
+
+				Selection.Sheet = Sheet;
+				Selection.A = Sheet.Cells[CurRange.StartPos];
+				Selection.D = Sheet.Cells[CurRange.EndPos];
+				Selection.B = Sheet.Cells[Selection.A.Row, Selection.D.Column];
+				Selection.C = Sheet.Cells[Selection.D.Row, Selection.A.Column];
+
+				CtxMenu.Show(Grid, Grid.PointToClient(MousePosition));
+			}
 		}
 
 		private void GridOnClick(object Sender, EventArgs E) {
 			ColorSheet(Grid.CurrentWorksheet);
 		}
 
+		void Interpolate(GridSelection Sel) {
+			Cell A = Sel.A, B = Sel.B, C = Sel.C, D = Sel.D;
+
+			for (int Y = Sel.Y1; Y <= Sel.Y2; Y++)
+				for (int X = Sel.X1; X <= Sel.X2; X++) {
+					double Data = 0;
+
+					if (Sel.Width == 1)
+						Data = Utils.Lerp((double)A.Data, (double)D.Data, Sel.Y1, Sel.Y2, Y);
+					else if (Sel.Height == 1)
+						Data = Utils.Lerp((double)A.Data, (double)B.Data, Sel.X1, Sel.X2, X);
+					else
+						Data = Utils.Bilinear((double)A.Data, (double)B.Data, (double)C.Data, (double)D.Data, Sel.X1, Sel.X2, Sel.Y1, Sel.Y2, X, Y);
+
+					Sel.Sheet.Cells[Y, X].Data = Math.Round(Data, 2);
+				}
+
+			ColorSheet(Sel.Sheet);
+		}
+
 		void ColorSheet(Worksheet Sheet) {
 			if (Sheet == null)
 				return;
 
-			for (int y = 0; y < Sheet.ColumnCount; y++)
-				for (int x = 0; x < Sheet.RowCount; x++) {
-					Cell CurCell = Sheet.Cells[x, y];
-					CurrentEdited.ColorCell(x, y, CurCell.Data, ref CurCell);
+			for (int X = 0; X < Sheet.ColumnCount; X++)
+				for (int Y = 0; Y < Sheet.RowCount; Y++) {
+					Cell CurCell = Sheet.Cells[Y, X];
+					CurrentEdited.ColorCell(X, Y, CurCell.Data, ref CurCell);
 				}
 		}
 
@@ -106,7 +204,9 @@ namespace MapEdit {
 
 							WSheet.RowCount = 1;
 							WSheet.ColumnCount = 1;
+
 							Data.PopulateSheet(WSheet);
+							Interpolate(new GridSelection(WSheet));
 						}
 
 						Grid.CurrentWorksheet = Data.Worksheet;

@@ -10,7 +10,7 @@ using unvell.ReoGrid.Graphics;
 
 namespace MapEdit {
 	public static class Utils {
-		public static double Lerp(double A, double B, float X) {
+		public static double Lerp(double A, double B, double X) {
 			if (X <= 0)
 				return A;
 
@@ -18,6 +18,11 @@ namespace MapEdit {
 				return B;
 
 			return A + ((B - A) * X);
+		}
+
+		public static double Lerp(double A, double B, double X1, double X2, double X) {
+			double DX = (X - X1) / (X2 - X1);
+			return Lerp(A, B, DX);
 		}
 
 		public static byte Lerp(byte A, byte B, float X) {
@@ -62,6 +67,16 @@ namespace MapEdit {
 
 			return Val;
 		}
+
+		public static double Bilinear(double A, double B, double C, double D, double DX, double DY) {
+			return Lerp(Lerp(A, B, DX), Lerp(C, D, DX), DY);
+		}
+
+		public static double Bilinear(double A, double B, double C, double D, double X1, double X2, double Y1, double Y2, double X, double Y) {
+			double DX = (X - X1) / (X2 - X1);
+			double DY = (Y - Y1) / (Y2 - Y1);
+			return Bilinear(A, B, C, D, DX, DY);
+		}
 	}
 
 	public enum EditMode {
@@ -96,7 +111,7 @@ namespace MapEdit {
 
 		protected void GenerateXAxis(Worksheet Sheet, int Count, Func<int, string> GenName) {
 			Sheet.ColumnCount = Count;
-			Sheet.SetColumnsWidth(0, Count, 40);
+			Sheet.SetColumnsWidth(0, Count, 45);
 
 			for (int i = 0; i < Count; i++)
 				Sheet.ColumnHeaders[i].Text = GenName(i);
@@ -110,15 +125,6 @@ namespace MapEdit {
 		}
 
 		public virtual void PopulateSheet(Worksheet Sheet) {
-			for (int y = 0; y < Sheet.RowCount; y++)
-				for (int x = 0; x < Sheet.ColumnCount; x++) {
-
-					Sheet.Cells[y, x].Data = GetDefaultValue(x, y, Sheet.ColumnCount, Sheet.RowCount, (double)x / Sheet.ColumnCount, (double)y / Sheet.RowCount);
-				}
-		}
-
-		public virtual object GetDefaultValue(int X, int Y, int W, int H, double WP, double HP) {
-			return DefaultValue;
 		}
 
 		public virtual void ColorCell(int X, int Y, object Value, ref Cell C) {
@@ -179,6 +185,9 @@ namespace MapEdit {
 				return MaxPulseWidth - MinPulseWidth;
 			}
 		}
+
+		[Description("Shut off fuel when coasting on 0% throttle"), Category("Fuel injector")]
+		public bool FuelShutOff { get; set; } = false;
 	}
 
 	[DesignerCategory("Maps"), DisplayName("Fuel injection map")]
@@ -199,7 +208,11 @@ namespace MapEdit {
 		public override void PopulateSheet(Worksheet Sheet) {
 			GenerateXAxis(Sheet, 26, (i) => string.Format("{0}", i * 500));
 			GenerateYAxis(Sheet, 21, (i) => string.Format("{0} %", i * 5));
-			base.PopulateSheet(Sheet);
+
+			Sheet[0, 0] = 1.0;
+			Sheet[Sheet.RowCount - 1, 0] = 2.0;
+			Sheet[0, Sheet.ColumnCount - 1] = 2.0;
+			Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = 5.0;
 		}
 
 		public override void ColorCell(int X, int Y, object Value, ref Cell C) {
@@ -207,15 +220,6 @@ namespace MapEdit {
 
 			if (Value is double Num)
 				C.Style.BackColor = Utils.Lerp(new SolidColor(104, 162, 255), SolidColor.Green, new SolidColor(255, 70, 61), EngineData.MinPulseWidth, EngineData.MaxPulseWidth, (float)Num);
-		}
-
-		public override object GetDefaultValue(int X, int Y, int W, int H, double WP, double HP) {
-			WP += 0.25;
-			HP += 0.3;
-			double Val = Utils.Lerp(EngineData.MinPulseWidth, EngineData.MaxPulseWidth, (float)(WP * HP * 0.7));
-
-			Val = Utils.Clamp(Val, EngineData.MinPulseWidth, EngineData.MaxPulseWidth);
-			return Math.Round(Val, 2);
 		}
 	}
 
@@ -235,7 +239,9 @@ namespace MapEdit {
 		public override void PopulateSheet(Worksheet Sheet) {
 			GenerateXAxis(Sheet, 26, (i) => string.Format("{0}", i * 500));
 			GenerateYAxis(Sheet, 21, (i) => string.Format("{0} %", i * 5));
-			base.PopulateSheet(Sheet);
+
+			Sheet[0, 0] = Sheet[Sheet.RowCount - 1, 0] = 2.0;
+			Sheet[0, Sheet.ColumnCount - 1] = Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = -30.0;
 		}
 
 		public override void ColorCell(int X, int Y, object Value, ref Cell C) {
@@ -243,13 +249,6 @@ namespace MapEdit {
 
 			if (Value is double Num)
 				C.Style.BackColor = Utils.Lerp(new SolidColor(66, 134, 244), SolidColor.Green, new SolidColor(255, 158, 89), -20, 5, (float)Num, Center: 0);
-		}
-
-		public override object GetDefaultValue(int X, int Y, int W, int H, double WP, double HP) {
-			double Val = 5 - 25 * (WP);
-
-			Val = Utils.Clamp(Val, -30, 30);
-			return Math.Round(Val, 2);
 		}
 	}
 }
