@@ -30,6 +30,7 @@ namespace MapEdit {
 				EData,
 				new InjectionMap(EData),
 				new AdvanceMap(EData),
+				new LoadLimiter(EData),
 			};
 			SetEditable(Datas);
 		}

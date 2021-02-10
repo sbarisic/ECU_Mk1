@@ -173,24 +173,24 @@ namespace MapEdit {
 
 		// Fuel injector
 
-		[Description("Minimum allowed injector pulse width [ms]"), Category("Fuel injector")]
-		public float MinPulseWidth { get; set; } = 1.0f;
+		[Description("Minimum allowed AFR [A/F]"), Category("Fuel injector")]
+		public float MinAFR { get; set; } = 11.0f;
 
-		[Description("Maximum allowed injector pulse width [ms]"), Category("Fuel injector")]
-		public float MaxPulseWidth { get; set; } = 5.0f;
+		[Description("Maximum allowed AFR [A/F]"), Category("Fuel injector")]
+		public float MaxAFR { get; set; } = 16.0f;
 
-		[Description("Calculated injector pulse range [ms]"), Category("Fuel injector")]
+		/*[Description("Calculated injector pulse range [ms]"), Category("Fuel injector")]
 		public float PulseRange {
 			get {
 				return MaxPulseWidth - MinPulseWidth;
 			}
-		}
+		}*/
 
 		[Description("Shut off fuel when coasting on 0% throttle"), Category("Fuel injector")]
 		public bool FuelShutOff { get; set; } = false;
 	}
 
-	[DesignerCategory("Maps"), DisplayName("Fuel injection map")]
+	[DesignerCategory("Maps"), DisplayName("Fuel map")]
 	public class InjectionMap : EditableData {
 		EngineData EngineData;
 
@@ -201,7 +201,7 @@ namespace MapEdit {
 
 			XName = "Engine speed [RPM]";
 			YName = "Engine load [%]";
-			ValueName = "Injector time [ms]";
+			ValueName = "Target A/F";
 			DefaultValue = 10.0;
 		}
 
@@ -209,21 +209,28 @@ namespace MapEdit {
 			GenerateXAxis(Sheet, 26, (i) => string.Format("{0}", i * 500));
 			GenerateYAxis(Sheet, 21, (i) => string.Format("{0} %", i * 5));
 
-			Sheet[0, 0] = 1.0;
-			Sheet[Sheet.RowCount - 1, 0] = 2.0;
-			Sheet[0, Sheet.ColumnCount - 1] = 2.0;
-			Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = 5.0;
+			// Top left
+			Sheet[0, 0] = 14.7;
+
+			// Bottom left
+			Sheet[Sheet.RowCount - 1, 0] = 14.0;
+
+			// Top right
+			Sheet[0, Sheet.ColumnCount - 1] = 13.0;
+
+			// Bottom right
+			Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = 11.0;
 		}
 
 		public override void ColorCell(int X, int Y, object Value, ref Cell C) {
 			C.Style.BackColor = SolidColor.Transparent;
 
 			if (Value is double Num)
-				C.Style.BackColor = Utils.Lerp(new SolidColor(104, 162, 255), SolidColor.Green, new SolidColor(255, 70, 61), EngineData.MinPulseWidth, EngineData.MaxPulseWidth, (float)Num);
+				C.Style.BackColor = Utils.Lerp(new SolidColor(104, 162, 255), SolidColor.Green, new SolidColor(255, 0, 0), EngineData.MinAFR, EngineData.MaxAFR, (float)Num);
 		}
 	}
 
-	[DesignerCategory("Maps"), DisplayName("Spark advance map")]
+	[DesignerCategory("Maps"), DisplayName("Ignition advance map")]
 	public class AdvanceMap : EditableData {
 		EngineData EngineData;
 
@@ -232,8 +239,8 @@ namespace MapEdit {
 
 			XName = "Engine speed [RPM]";
 			YName = "Engine load [%]";
-			ValueName = "Spark advance [Deg, 0 at TDC]";
-			DefaultValue = -2.0;
+			ValueName = "Spark advance [° before TDC]";
+			DefaultValue = 0.0;
 		}
 
 		public override void PopulateSheet(Worksheet Sheet) {
@@ -242,13 +249,59 @@ namespace MapEdit {
 
 			Sheet[0, 0] = Sheet[Sheet.RowCount - 1, 0] = 2.0;
 			Sheet[0, Sheet.ColumnCount - 1] = Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = -30.0;
+
+			// Top left
+			Sheet[0, 0] = 10.0;
+
+			// Bottom left
+			Sheet[Sheet.RowCount - 1, 0] = -10.0;
+
+			// Top right
+			Sheet[0, Sheet.ColumnCount - 1] = 10.0;
+
+			// Bottom right
+			Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = 10.0;
 		}
 
 		public override void ColorCell(int X, int Y, object Value, ref Cell C) {
 			C.Style.BackColor = SolidColor.Transparent;
 
 			if (Value is double Num)
-				C.Style.BackColor = Utils.Lerp(new SolidColor(66, 134, 244), SolidColor.Green, new SolidColor(255, 158, 89), -20, 5, (float)Num, Center: 0);
+				C.Style.BackColor = Utils.Lerp(SolidColor.Blue, SolidColor.Green, SolidColor.Red, -20, 20, (float)Num, Center: 0);
+		}
+	}
+
+	[DesignerCategory("Maps"), DisplayName("Load limiter by gear map")]
+	public class LoadLimiter : EditableData {
+		public LoadLimiter(EngineData EngineData) : base(EditMode.Grid) {
+			XName = "Engine speed [RPM]";
+			YName = "Gearbox gear";
+			ValueName = "Engine load limit [% of max load]";
+			DefaultValue = 100.0;
+		}
+
+		public override void PopulateSheet(Worksheet Sheet) {
+			GenerateXAxis(Sheet, 26, (i) => string.Format("{0}", i * 500));
+			GenerateYAxis(Sheet, 6, (i) => string.Format("{0}", i + 1));
+
+			// Top left
+			Sheet[0, 0] = 100.0;
+
+			// Bottom left
+			Sheet[Sheet.RowCount - 1, 0] = 100.0;
+
+			// Top right
+			Sheet[0, Sheet.ColumnCount - 1] = 100.0;
+
+			// Bottom right
+			Sheet[Sheet.RowCount - 1, Sheet.ColumnCount - 1] = 100.0;
+		}
+
+		public override void ColorCell(int X, int Y, object Value, ref Cell C) {
+			C.Style.BackColor = SolidColor.Transparent;
+
+			if (Value is double Num)
+				C.Style.BackColor = Utils.Lerp(SolidColor.Red, SolidColor.Green, SolidColor.Blue, 0, 200, (float)Num, Center: 100);
 		}
 	}
 }
